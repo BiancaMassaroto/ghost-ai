@@ -8,7 +8,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Goal
 
-- `03-auth.md` is complete, and the `/editor` route it redirects authenticated users to now exists (chrome only — navbar, project sidebar, canvas placeholder). No feature-spec file defines the next unit yet.
+- `04-project-dialogs.md` is complete: the `/editor` home state, Create/Rename/Delete project dialogs, and sidebar project actions are wired against mock data.
 
 ## Completed
 
@@ -34,6 +34,19 @@ Update this file whenever the current phase, active feature, or implementation s
   - `components/editor/editor-shell.tsx` (new, client component) — lifts `isSidebarOpen` state (defaults `true`) and composes `EditorNavbar` + `ProjectSidebar`. Below the navbar, a `relative flex-1` region hosts the (still-`fixed`-overlay) `ProjectSidebar` plus a plain centered "Canvas workspace coming soon." placeholder — the real collaborative canvas (Liveblocks + React Flow, per `architecture-context.md`) isn't built yet, so nothing beyond an empty-state placeholder was added, consistent with the existing empty-state pattern already in `ProjectSidebar`'s tabs.
   - `app/editor/page.tsx` (new, server component) — just renders `<EditorShell />`; protected by `proxy.ts`'s default-protect rule like every other non-auth route.
   - Verified: `next build` now lists `○ /editor` as a real prerendered route (previously nonexistent); `eslint` clean; manually confirmed via `next dev` that unauthenticated `GET /editor` now 307s to `/sign-in?redirect_url=...` instead of 404ing.
+- `04-project-dialogs.md`: editor home content, the three project dialogs, and sidebar project actions — all against mock data, no API calls or persistence.
+  - `types/project.ts` (new) — `Project` interface (`id`, `name`, `slug`, `role: "owner" | "collaborator"`).
+  - `lib/mock-projects.ts` (new) — seed `MOCK_PROJECTS` array (two owned, one collaborator) used until real project storage exists.
+  - `lib/utils.ts` — added `slugify()` alongside `cn()`: lowercases, replaces non-alphanumeric runs with `-`, trims leading/trailing `-`.
+  - `hooks/use-mock-projects.ts` (new) — owns the in-memory project list; `addProject`/`renameProject`/`deleteProject` mutate local state only (no backend), each auto-deriving `slug` via `slugify()`.
+  - `hooks/use-project-dialogs.ts` (new) — the dedicated hook called for in the spec. Owns dialog mode (`"create" | "rename" | "delete" | null`), the active project being acted on, the name form field (plus a derived live `slug` preview), and `isSubmitting`. `openCreateDialog`/`openRenameDialog`/`openDeleteDialog`/`closeDialog` manage dialog state; `submitCreate`/`submitRename`/`submitDelete` each set `isSubmitting`, await a short artificial delay (300ms, no network — purely so the loading state in the UI is observable), call the corresponding data callback (from `useMockProjects`), then close. Deliberately decoupled from `useMockProjects` (takes `onCreate`/`onRename`/`onDelete` callbacks) so the dialog/form/loading concern stays separate from the mock-data-storage concern, per "keep modules small and single-purpose" in `code-standards.md`.
+  - `components/editor/project-dialogs.tsx` (new, client) — Create/Rename/Delete dialogs built on the existing `components/ui/dialog.tsx` (unmodified, per the protected-foundation rule). Each `Dialog` is controlled via `open={mode === "..."}` / `onOpenChange` off `useProjectDialogs`'s state (confirmed `@base-ui/react/dialog`'s `DialogRoot.Props` — `open`/`onOpenChange` — via its `.d.ts` before using it, per `AGENTS.md`'s "check node_modules docs first" for this pre-release stack). Create: name input + live slug preview text under it. Rename: prefilled input, current name in the description, `autoFocus`, wrapped in a `<form onSubmit>` so Enter submits. Delete: no input, description-only confirmation, confirm button uses the existing `destructive` Button variant.
+  - `components/editor/editor-home.tsx` (new, client) — the center-of-canvas empty state: heading, description, `New Project` button (`Plus` icon), no cards, per spec. Takes `onNewProject` and renders in place of the old "Canvas workspace coming soon." placeholder.
+  - `components/editor/project-sidebar.tsx` — now renders real rows from mock data instead of always showing the empty state (empty state still shows when a list is genuinely empty). "My Projects" renders owned projects with hover-revealed Rename (`Pencil`)/Delete (`Trash2`) icon buttons; "Shared" renders collaborator projects with no actions, per spec. Added a `md:hidden` fixed backdrop scrim (`bg-black/50`) rendered while `isOpen`, clicking it calls `onClose` — satisfies "tapping outside the sidebar closes it" + "add a backdrop scrim" on mobile without changing desktop behavior (backdrop hidden at `md` and above). The existing bottom `New Project` button is now wired to `onNewProject`.
+  - `components/editor/editor-shell.tsx` — composes `useMockProjects()` + `useProjectDialogs()`, wires: editor-home `New Project` → create dialog, sidebar `New Project` → create dialog, sidebar row rename/delete → rename/delete dialogs (all via the same `dialogs` object), and renders `<ProjectDialogs dialogs={dialogs} />` once at the shell level.
+  - No new shadcn components added — sidebar row actions use plain `Button`s (existing `icon-xs` size) rather than introducing a dropdown-menu component, keeping scope to exactly what the spec asked for.
+  - Verified: `tsc --noEmit`, `eslint` (0 errors — the one warning present is pre-existing, in an unrelated `.agents/skills/` template file), and `next build` all pass clean; `next dev` smoke-tested that `/editor` still 307s to sign-in when unauthenticated (chrome renders, nothing crashed).
+  - Follow-up visual pass, from user-supplied reference screenshots: `editor-home.tsx` now centers via `absolute inset-0 flex items-center justify-center` instead of `h-full`, so it's pinned dead-center of the canvas area regardless of ancestor height-resolution; description-level text (`DialogDescription` in all three dialogs, `EditorHome`'s paragraph, sidebar empty-state labels) switched from `text-copy-muted` (`#808090`) to the lighter `text-copy-secondary` (`#c0c0cc`) for better contrast on the near-black background — done via `className` overrides on call sites, not by editing `components/ui/dialog.tsx`, per the protected-foundation rule. Also aligned Create-dialog copy with the reference: title "New Project", description "Give your project a name to get started.", secondary button relabeled "Cancel" → "Close" (all three dialogs, for consistency), and the slug preview line now renders only once the user has typed a name instead of showing a permanent "your-project-slug" placeholder.
 
 ## In Progress
 
@@ -41,7 +54,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Next Up
 
-- Add the next planned feature unit here (real canvas subsystem, project persistence, etc. — none of these have a feature-spec file yet).
+- Add the next planned feature unit here (real canvas subsystem, real project persistence/API routes replacing the mock hooks, etc. — none of these have a feature-spec file yet).
 
 ## Open Questions
 
@@ -51,6 +64,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 - Route protection lives in `proxy.ts` at the project root, not `middleware.ts` — Next.js 16 renamed the file convention (`middleware` → `proxy`); the API and semantics are otherwise unchanged.
 - Clerk `appearance` is themed once, centrally, in `lib/clerk-appearance.ts` (`{ theme: dark, variables: {...} }` using this Clerk version's `theme` key, not the older `baseTheme` prop) and passed to `ClerkProvider` in the root layout, rather than repeated per-component — all Clerk UI (`SignIn`, `SignUp`, `UserButton`) inherits it automatically.
+- Mock project data and dialog UI state are kept in two separate hooks (`useMockProjects` for the data list, `useProjectDialogs` for dialog/form/loading state), connected only via callbacks (`onCreate`/`onRename`/`onDelete`). When real persistence lands, `useMockProjects` is the one hook that gets replaced with API-backed data fetching/mutations — `useProjectDialogs` and the dialog UI should need no changes.
 
 ## Session Notes
 

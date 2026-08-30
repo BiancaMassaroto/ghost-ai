@@ -2,11 +2,15 @@
 
 import { useState } from "react";
 
+import { AiSidebar } from "@/components/editor/ai-sidebar";
+import { CanvasPlaceholder } from "@/components/editor/canvas-placeholder";
 import { EditorHome } from "@/components/editor/editor-home";
 import { EditorNavbar } from "@/components/editor/editor-navbar";
 import { ProjectDialogs } from "@/components/editor/project-dialogs";
 import { ProjectSidebar } from "@/components/editor/project-sidebar";
+import { ShareDialog } from "@/components/editor/share-dialog";
 import { useProjectActions } from "@/hooks/use-project-actions";
+import { useShareDialog } from "@/hooks/use-share-dialog";
 import type { Project } from "@/types/project";
 
 interface EditorShellProps {
@@ -32,13 +36,22 @@ export function EditorShell({
   activeProject,
 }: EditorShellProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isAiSidebarOpen, setIsAiSidebarOpen] = useState(false);
   const actions = useProjectActions({ activeProjectId: activeProject?.id });
+  const share = useShareDialog({
+    projectId: activeProject?.id ?? "",
+    isOwner: activeProject?.role === "owner",
+  });
 
   return (
     <div className="flex flex-1 flex-col">
       <EditorNavbar
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen((open) => !open)}
+        projectName={activeProject?.name}
+        isAiSidebarOpen={isAiSidebarOpen}
+        onToggleAiSidebar={() => setIsAiSidebarOpen((open) => !open)}
+        onShare={share.open}
       />
 
       <div className="relative flex-1 bg-canvas">
@@ -46,26 +59,28 @@ export function EditorShell({
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
           projects={[...ownedProjects, ...sharedProjects]}
+          activeProjectId={activeProject?.id}
           onNewProject={actions.openCreateDialog}
           onRenameProject={actions.openRenameDialog}
           onDeleteProject={actions.openDeleteDialog}
         />
 
+        <AiSidebar
+          isOpen={isAiSidebarOpen}
+          onClose={() => setIsAiSidebarOpen(false)}
+        />
+
         {activeProject ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
-            <h1 className="text-lg font-medium text-copy-primary">
-              {activeProject.name}
-            </h1>
-            <p className="max-w-sm text-sm text-copy-secondary">
-              Canvas workspace coming soon.
-            </p>
-          </div>
+          <CanvasPlaceholder projectName={activeProject.name} />
         ) : (
           <EditorHome onNewProject={actions.openCreateDialog} />
         )}
       </div>
 
       <ProjectDialogs actions={actions} />
+      {activeProject && (
+        <ShareDialog share={share} isOwner={activeProject.role === "owner"} />
+      )}
     </div>
   );
 }

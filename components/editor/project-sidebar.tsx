@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,8 @@ interface ProjectSidebarProps {
   /** Called when the close button, or the mobile backdrop, is pressed. */
   onClose: () => void;
   projects: Project[];
+  /** ID of the project open in the workspace, if any. Highlights its row. */
+  activeProjectId?: string;
   /** Opens the Create Project dialog. */
   onNewProject: () => void;
   /** Opens the Rename Project dialog for the given project. */
@@ -32,20 +35,43 @@ function EmptyProjectsState({ label }: { label: string }) {
 
 function ProjectRow({
   project,
+  isActive,
   showActions,
   onRename,
   onDelete,
 }: {
   project: Project;
+  isActive: boolean;
   showActions: boolean;
   onRename: () => void;
   onDelete: () => void;
 }) {
   return (
-    <div className="group flex items-center gap-1 rounded-lg px-2 py-1.5 hover:bg-elevated">
-      <span className="flex-1 truncate text-sm text-copy-primary">
-        {project.name}
-      </span>
+    <div
+      className={cn(
+        "group flex items-center gap-1 rounded-xl pr-2",
+        isActive ? "bg-accent-dim" : "hover:bg-elevated",
+      )}
+    >
+      <Link
+        href={`/editor/${project.id}`}
+        className="flex min-w-0 flex-1 items-center gap-2 py-2 pl-3"
+      >
+        <span
+          className={cn(
+            "h-1.5 w-1.5 shrink-0 rounded-full",
+            isActive ? "bg-brand" : "bg-transparent",
+          )}
+        />
+        <span
+          className={cn(
+            "flex-1 truncate text-sm",
+            isActive ? "font-medium text-copy-primary" : "text-copy-primary",
+          )}
+        >
+          {project.name}
+        </span>
+      </Link>
       {showActions && (
         <div className="flex items-center gap-0.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
           <Button
@@ -74,6 +100,7 @@ export function ProjectSidebar({
   isOpen,
   onClose,
   projects,
+  activeProjectId,
   onNewProject,
   onRenameProject,
   onDeleteProject,
@@ -96,6 +123,7 @@ export function ProjectSidebar({
 
       <aside
         aria-hidden={!isOpen}
+        inert={!isOpen}
         className={cn(
           "fixed top-14 bottom-0 left-0 z-40 flex w-72 flex-col border-r border-surface-border bg-surface/95 shadow-2xl backdrop-blur-sm transition-transform duration-200 ease-out",
           isOpen ? "translate-x-0" : "-translate-x-full",
@@ -103,7 +131,7 @@ export function ProjectSidebar({
         )}
       >
         <div className="flex h-12 shrink-0 items-center justify-between border-b border-surface-border px-4">
-          <h2 className="text-sm font-medium text-copy-primary">Projects</h2>
+          <h2 className="text-sm font-semibold text-copy-primary">Projects</h2>
           <Button
             variant="ghost"
             size="icon-sm"
@@ -118,11 +146,17 @@ export function ProjectSidebar({
           defaultValue="my-projects"
           className="flex flex-1 flex-col overflow-hidden px-4 pt-3"
         >
-          <TabsList className="w-full">
-            <TabsTrigger value="my-projects" className="flex-1">
+          <TabsList className="w-full rounded-full bg-subtle p-1">
+            <TabsTrigger
+              value="my-projects"
+              className="flex-1 rounded-full text-copy-muted data-active:bg-elevated data-active:text-copy-primary"
+            >
               My Projects
             </TabsTrigger>
-            <TabsTrigger value="shared" className="flex-1">
+            <TabsTrigger
+              value="shared"
+              className="flex-1 rounded-full text-copy-muted data-active:bg-elevated data-active:text-copy-primary"
+            >
               Shared
             </TabsTrigger>
           </TabsList>
@@ -139,6 +173,7 @@ export function ProjectSidebar({
                   <ProjectRow
                     key={project.id}
                     project={project}
+                    isActive={project.id === activeProjectId}
                     showActions
                     onRename={() => onRenameProject(project)}
                     onDelete={() => onDeleteProject(project)}
@@ -160,6 +195,7 @@ export function ProjectSidebar({
                   <ProjectRow
                     key={project.id}
                     project={project}
+                    isActive={project.id === activeProjectId}
                     showActions={false}
                     onRename={() => onRenameProject(project)}
                     onDelete={() => onDeleteProject(project)}
@@ -172,7 +208,7 @@ export function ProjectSidebar({
 
         <div className="shrink-0 border-t border-surface-border p-4">
           <Button
-            className="w-full justify-center gap-1.5"
+            className="w-full justify-center gap-1.5 rounded-full"
             onClick={onNewProject}
           >
             <Plus className="h-4 w-4" />

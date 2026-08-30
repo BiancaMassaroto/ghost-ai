@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { checkProjectAccess } from "@/lib/project-access";
 import { slugify } from "@/lib/utils";
 import type { Project as DbProject } from "@/app/generated/prisma/client";
 import type { Project } from "@/types/project";
@@ -47,26 +48,18 @@ export async function getUserProjects(
 
 /**
  * Resolves a single project for display, verifying the given user may view
- * it (owner or collaborator by email). Returns `null` if the project
- * doesn't exist or the user has no access — callers should treat that as a
- * 404, not leak which case it was.
+ * it (owner or collaborator by email) via `checkProjectAccess`. Returns
+ * `null` if the project doesn't exist or the user has no access — callers
+ * should treat both as the same case (render `AccessDenied`), not leak
+ * which one it was.
  */
 export async function getProjectAccess(
   projectId: string,
   userId: string,
   email: string | null,
 ): Promise<Project | null> {
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) return null;
+  const access = await checkProjectAccess(projectId, userId, email);
+  if (!access) return null;
 
-  if (project.ownerId === userId) return toProject(project, "owner");
-
-  if (email) {
-    const collaborator = await prisma.projectCollaborator.findUnique({
-      where: { projectId_email: { projectId, email } },
-    });
-    if (collaborator) return toProject(project, "collaborator");
-  }
-
-  return null;
+  return toProject(access.project, access.role);
 }

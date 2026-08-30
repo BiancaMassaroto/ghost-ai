@@ -8,7 +8,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Goal
 
-- `04-project-dialogs.md` is complete: the `/editor` home state, Create/Rename/Delete project dialogs, and sidebar project actions are wired against mock data.
+- `05-prisma.md` is complete: `Project`/`ProjectCollaborator` data models, the cached Prisma Client singleton, and the first migration are in place. Real project persistence (API routes replacing `useMockProjects`) is the next unit — no feature-spec file covers it yet.
 
 ## Completed
 
@@ -48,13 +48,23 @@ Update this file whenever the current phase, active feature, or implementation s
   - Verified: `tsc --noEmit`, `eslint` (0 errors — the one warning present is pre-existing, in an unrelated `.agents/skills/` template file), and `next build` all pass clean; `next dev` smoke-tested that `/editor` still 307s to sign-in when unauthenticated (chrome renders, nothing crashed).
   - Follow-up visual pass, from user-supplied reference screenshots: `editor-home.tsx` now centers via `absolute inset-0 flex items-center justify-center` instead of `h-full`, so it's pinned dead-center of the canvas area regardless of ancestor height-resolution; description-level text (`DialogDescription` in all three dialogs, `EditorHome`'s paragraph, sidebar empty-state labels) switched from `text-copy-muted` (`#808090`) to the lighter `text-copy-secondary` (`#c0c0cc`) for better contrast on the near-black background — done via `className` overrides on call sites, not by editing `components/ui/dialog.tsx`, per the protected-foundation rule. Also aligned Create-dialog copy with the reference: title "New Project", description "Give your project a name to get started.", secondary button relabeled "Cancel" → "Close" (all three dialogs, for consistency), and the slug preview line now renders only once the user has typed a name instead of showing a permanent "your-project-slug" placeholder.
 
+- `05-prisma.md`: relational data models, Prisma Client singleton, and first migration.
+  - `prisma/models/project.prisma` (new) — multi-file schema model, picked up automatically since `prisma7.config.ts` already points `schema` at the `prisma/` directory rather than a single file.
+    - `Project`: `id` (`cuid()`), `ownerId` (Clerk user ID, stored as a plain string — no FK, since users live in Clerk, not this database), `name`, optional `description`, `status` (`ProjectStatus` enum: `DRAFT` | `ARCHIVED`, `@default(DRAFT)`), `canvasJsonPath` (optional — no snapshot exists until the canvas subsystem lands), `createdAt`/`updatedAt`. Indexes on `ownerId` and `createdAt` (separate indexes, per spec's "indexes on owner ID and creation date" reading — contrast with `ProjectCollaborator`'s combined `project/date` index below). Reverse `collaborators ProjectCollaborator[]` relation field added because Prisma requires both sides of an explicit relation to be declared.
+    - `ProjectCollaborator`: `id` (`cuid()`), `projectId` + `project` relation (`onDelete: Cascade`), `email`, `createdAt`. `@@unique([projectId, email])`; indexes on `email` alone and on the combined `[projectId, createdAt]`, per spec's "project/date" phrasing.
+  - `lib/prisma.ts` (new) — cached singleton, following the pattern in `constructor.md`/`Singleton Pattern` (`globalForPrisma` cast on `globalThis`, cached outside production so Next.js hot reloads reuse one client). Branches on `DATABASE_URL`: a `prisma+postgres://` prefix passes `accelerateUrl` straight to the `PrismaClient` constructor (no `@prisma/extension-accelerate` — that package isn't in the spec's "already installed" list, and `accelerateUrl` alone is a valid constructor option without it); anything else (the actual current `DATABASE_URL`, a `postgres://...pooled.db.prisma.io...` pooled connection string) builds a `PrismaPg` adapter from `@prisma/adapter-pg` and passes that instead.
+  - Import path note: the `prisma-client` generator's output (`app/generated/prisma/`, per the pre-existing `generator client` block in `prisma/schema.prisma`) has no root `index`/`package.json` re-export — `PrismaClient` must be imported from the `client` subpath specifically (`@/app/generated/prisma/client`), not the bare `@/app/generated/prisma` directory shown in generic Prisma docs/skill examples.
+  - Ran `prisma migrate dev --name init_project_models` (applied cleanly, first migration in `prisma/migrations/`) then `prisma generate` explicitly per this Prisma version's CLI behavior (generation is no longer bundled into `migrate dev`).
+  - Verified: `prisma validate`, `tsc --noEmit`, `eslint`, and `npm run build` all pass clean.
+
 ## In Progress
 
 - None — all completed work above is done as scoped.
 
 ## Next Up
 
-- Add the next planned feature unit here (real canvas subsystem, real project persistence/API routes replacing the mock hooks, etc. — none of these have a feature-spec file yet).
+- Real project persistence: API routes backed by `lib/prisma.ts`/the new models, replacing `useMockProjects`. No feature-spec file covers this yet.
+- Real canvas subsystem (Liveblocks + React Flow) — no feature-spec file yet.
 
 ## Open Questions
 

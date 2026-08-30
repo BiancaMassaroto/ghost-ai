@@ -64,7 +64,7 @@ export default function AuthLayout({ children }: LayoutProps<"/">) {
         </p>
       </div>
 
-      <div className="flex flex-1 items-center justify-center bg-base px-6">
+      <div className="flex flex-1 items-center justify-center bg-canvas px-6">
         {children}
       </div>
     </div>

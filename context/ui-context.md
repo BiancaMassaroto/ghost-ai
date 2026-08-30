@@ -26,7 +26,9 @@ All colors are defined as CSS custom properties in `globals.css` and mapped to T
 | Success          | `--state-success`      | `#34d399`                 |
 | Warning          | `--state-warning`      | `#fbbf24`                 |
 
-Tailwind utility names map to these variables. Use `bg-base`, `bg-surface`, `text-copy-primary`, `text-copy-muted`, `border-surface-border`, `text-brand`, `bg-accent-dim`, etc.
+Tailwind utility names map to these variables. Use `bg-canvas`, `bg-surface`, `text-copy-primary`, `text-copy-muted`, `border-surface-border`, `text-brand`, `bg-accent-dim`, etc.
+
+**Reserved name:** never expose a color token as `base` (i.e. don't add `--color-base`). Tailwind's own font-size scale already owns that key (`text-base` = 1rem), and a color theme value wins the collision — every `text-base` in the app would silently become `color: var(--bg-base)` (near-black text) instead of a font size. The page background is exposed as `bg-canvas` for this reason, even though its CSS variable is still named `--bg-base`.
 
 ## Typography
 

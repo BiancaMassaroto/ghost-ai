@@ -10,29 +10,30 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { UseProjectDialogsResult } from "@/hooks/use-project-dialogs";
+import type { UseProjectActionsResult } from "@/hooks/use-project-actions";
 
 interface ProjectDialogsProps {
-  dialogs: UseProjectDialogsResult;
+  actions: UseProjectActionsResult;
 }
 
 /**
- * Create/Rename/Delete project dialogs, per `04-project-dialogs.md`. Purely
- * presentational — all state and submit logic live in `useProjectDialogs`.
+ * Create/Rename/Delete project dialogs, per `07-wire-editor-home.md`. Purely
+ * presentational — all state and submit logic live in `useProjectActions`.
  */
-export function ProjectDialogs({ dialogs }: ProjectDialogsProps) {
+export function ProjectDialogs({ actions }: ProjectDialogsProps) {
   const {
     mode,
     activeProject,
     name,
-    slug,
+    roomId,
     isSubmitting,
+    error,
     setName,
     closeDialog,
     submitCreate,
     submitRename,
     submitDelete,
-  } = dialogs;
+  } = actions;
 
   const handleOpenChange = (open: boolean) => {
     if (!open) closeDialog();
@@ -62,10 +63,12 @@ export function ProjectDialogs({ dialogs }: ProjectDialogsProps) {
               value={name}
               onChange={(event) => setName(event.target.value)}
             />
-            {slug && (
-              <p className="px-0.5 text-xs text-copy-secondary">{slug}</p>
+            {roomId && (
+              <p className="px-0.5 text-xs text-copy-secondary">{roomId}</p>
             )}
           </form>
+
+          {error && <p className="px-0.5 text-xs text-destructive">{error}</p>}
 
           <DialogFooter>
             <Button
@@ -105,6 +108,8 @@ export function ProjectDialogs({ dialogs }: ProjectDialogsProps) {
             />
           </form>
 
+          {error && <p className="px-0.5 text-xs text-destructive">{error}</p>}
+
           <DialogFooter>
             <Button
               variant="ghost"
@@ -129,6 +134,8 @@ export function ProjectDialogs({ dialogs }: ProjectDialogsProps) {
               &rdquo;. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
+
+          {error && <p className="px-0.5 text-xs text-destructive">{error}</p>}
 
           <DialogFooter>
             <Button

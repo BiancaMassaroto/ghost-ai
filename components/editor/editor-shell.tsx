@@ -2,17 +2,30 @@
 
 import { useState } from "react";
 
+import { EditorHome } from "@/components/editor/editor-home";
 import { EditorNavbar } from "@/components/editor/editor-navbar";
+import { ProjectDialogs } from "@/components/editor/project-dialogs";
 import { ProjectSidebar } from "@/components/editor/project-sidebar";
+import { useMockProjects } from "@/hooks/use-mock-projects";
+import { useProjectDialogs } from "@/hooks/use-project-dialogs";
 
 /**
- * Composes the editor chrome (navbar + project sidebar) and lifts the shared
- * `isSidebarOpen` state between them, per the deferred wiring step noted in
- * `02-editor.md`. The center canvas is a placeholder until the collaborative
- * canvas subsystem (Liveblocks + React Flow) is built.
+ * Composes the editor chrome (navbar + project sidebar), the editor home
+ * state, and the Create/Rename/Delete project dialogs, per
+ * `04-project-dialogs.md`. Project data is mocked in `useMockProjects` —
+ * no API calls or persistence yet. The real collaborative canvas
+ * (Liveblocks + React Flow, per `architecture-context.md`) isn't built yet,
+ * so `EditorHome` stands in as the only canvas-area state.
  */
 export function EditorShell() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const { projects, addProject, renameProject, deleteProject } =
+    useMockProjects();
+  const dialogs = useProjectDialogs({
+    onCreate: addProject,
+    onRename: renameProject,
+    onDelete: deleteProject,
+  });
 
   return (
     <div className="flex flex-1 flex-col">
@@ -25,12 +38,16 @@ export function EditorShell() {
         <ProjectSidebar
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
+          projects={projects}
+          onNewProject={dialogs.openCreateDialog}
+          onRenameProject={dialogs.openRenameDialog}
+          onDeleteProject={dialogs.openDeleteDialog}
         />
 
-        <div className="flex h-full items-center justify-center text-sm text-copy-faint">
-          Canvas workspace coming soon.
-        </div>
+        <EditorHome onNewProject={dialogs.openCreateDialog} />
       </div>
+
+      <ProjectDialogs dialogs={dialogs} />
     </div>
   );
 }

@@ -1,8 +1,8 @@
-import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
 import { EditorShell } from "@/components/editor/editor-shell";
 import { getUserProjects } from "@/lib/get-projects";
+import { getCurrentIdentity } from "@/lib/project-access";
 
 /**
  * Editor home — server component per `07-wire-editor-home.md`. Fetches the
@@ -12,12 +12,10 @@ import { getUserProjects } from "@/lib/get-projects";
  * defensive fallback, not the primary path (same pattern as `app/page.tsx`).
  */
 export default async function EditorPage() {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
+  const identity = await getCurrentIdentity();
+  if (!identity) redirect("/sign-in");
 
-  const user = await currentUser();
-  const email = user?.primaryEmailAddress?.emailAddress ?? null;
-  const { owned, shared } = await getUserProjects(userId, email);
+  const { owned, shared } = await getUserProjects(identity.userId, identity.email);
 
   return <EditorShell ownedProjects={owned} sharedProjects={shared} />;
 }

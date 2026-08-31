@@ -89,7 +89,7 @@ Small white circular handles, hidden by default, revealed on node hover. Appear 
 
 ### Canvas Background
 
-React Flow `<Background>` component. Canvas sits on the base background color.
+React Flow `<Background>` component, dot-pattern variant. The canvas sits inside its own rounded, bordered panel (`bg-surface`, `rounded-2xl`, inset from the workspace edges) rather than flush against the page — see Layout Patterns below.
 
 ## Component Library
 
@@ -97,10 +97,11 @@ shadcn/ui on top of Tailwind. No custom design system. Components live in `compo
 
 ## Layout Patterns
 
-- Editor workspace: full-viewport layout — floating sidebar overlay on the left, center canvas, slide-over AI sidebar on the right.
-- Sidebars: floating overlay with dark semi-transparent background and subtle border.
+- Editor workspace: full-viewport layout, inset ~1rem from the navbar and viewport edges — a collapsible project sidebar on the left, a canvas panel that fills whatever space is left, and a collapsible AI sidebar on the right. All three are `rounded-2xl`, bordered `bg-surface` cards sitting on the page's base background color, with a visible gap between them and the viewport edges — not flush.
+- Sidebars: push/reflow panels, not overlays — each animates its own width between `0` and its open width (`rounded-2xl` on all corners, dark semi-transparent background `bg-surface/95` with `backdrop-blur-sm`, border on all sides). Opening or closing one resizes the canvas panel next to it rather than floating on top of it.
+- Canvas panel: same rounded/bordered treatment as the sidebars, and always fills whichever space the sidebars don't occupy — full width when both are closed, narrower when one or both are open.
 - Modals and dialogs: centered overlay, `rounded-3xl`, dark background with backdrop blur.
-- Navbar: top bar with dark background and bottom border.
+- Navbar: top bar with dark background and bottom border, flush to the viewport edges (unlike the panels below it).
 
 ## Icons
 

@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { AiSidebar } from "@/components/editor/ai-sidebar";
-import { CanvasPlaceholder } from "@/components/editor/canvas-placeholder";
+import { CanvasRoom } from "@/components/editor/canvas/canvas-room";
 import { EditorHome } from "@/components/editor/editor-home";
 import { EditorNavbar } from "@/components/editor/editor-navbar";
 import { ProjectDialogs } from "@/components/editor/project-dialogs";
@@ -54,7 +54,12 @@ export function EditorShell({
         onShare={share.open}
       />
 
-      <div className="relative flex-1 bg-canvas">
+      {/* A real flex row, not overlays — `ProjectSidebar`/`AiSidebar` each
+          animate their own width between `0` and their open width, so the
+          canvas panel (`flex-1`) reflows to fill whatever space either or
+          both leave behind, rather than sidebars floating on top of a
+          fixed-size canvas. */}
+      <div className="flex flex-1 overflow-hidden bg-canvas p-4">
         <ProjectSidebar
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
@@ -65,16 +70,18 @@ export function EditorShell({
           onDeleteProject={actions.openDeleteDialog}
         />
 
+        <div className="relative min-w-0 flex-1 overflow-hidden rounded-2xl border border-surface-border bg-surface">
+          {activeProject ? (
+            <CanvasRoom roomId={activeProject.id} />
+          ) : (
+            <EditorHome onNewProject={actions.openCreateDialog} />
+          )}
+        </div>
+
         <AiSidebar
           isOpen={isAiSidebarOpen}
           onClose={() => setIsAiSidebarOpen(false)}
         />
-
-        {activeProject ? (
-          <CanvasPlaceholder projectName={activeProject.name} />
-        ) : (
-          <EditorHome onNewProject={actions.openCreateDialog} />
-        )}
       </div>
 
       <ProjectDialogs actions={actions} />

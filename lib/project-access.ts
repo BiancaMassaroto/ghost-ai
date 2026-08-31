@@ -8,21 +8,34 @@ export type ProjectAccessRole = "owner" | "collaborator";
 export interface CurrentIdentity {
   userId: string;
   email: string | null;
+  displayName: string | null;
+  avatarUrl: string | null;
 }
 
 /**
- * Resolves the signed-in Clerk user's ID and primary email address, or
- * `null` if there's no session. Centralizes the identity lookup that every
- * project-scoped page needs (`auth()` for the ID, `currentUser()` for the
- * email used to match `ProjectCollaborator` rows), per
- * `08-editor-workspace-shell.md`.
+ * Resolves the signed-in Clerk user's ID, primary email address, display
+ * name, and avatar URL, or `null` if there's no session. Centralizes the
+ * identity lookup that every project-scoped page and route needs (`auth()`
+ * for the ID, `currentUser()` for the rest) — `displayName`/`avatarUrl` were
+ * added in `10-liveblocks-setup.md` for the Liveblocks auth route's session
+ * user info, matching the same name-derivation fallback already used in
+ * `lib/clerk-users.ts` (first + last name, then username, then `null`).
  */
 export async function getCurrentIdentity(): Promise<CurrentIdentity | null> {
   const { userId } = await auth();
   if (!userId) return null;
 
   const user = await currentUser();
-  return { userId, email: user?.primaryEmailAddress?.emailAddress ?? null };
+  const displayName = user
+    ? [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || user.username || null
+    : null;
+
+  return {
+    userId,
+    email: user?.primaryEmailAddress?.emailAddress ?? null,
+    displayName,
+    avatarUrl: user?.imageUrl || null,
+  };
 }
 
 /**

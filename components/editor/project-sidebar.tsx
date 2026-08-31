@@ -11,7 +11,7 @@ import type { Project } from "@/types/project";
 interface ProjectSidebarProps {
   /** Whether the sidebar is expanded into view. */
   isOpen: boolean;
-  /** Called when the close button, or the mobile backdrop, is pressed. */
+  /** Called when the close button is pressed. */
   onClose: () => void;
   projects: Project[];
   /** ID of the project open in the workspace, if any. Highlights its row. */
@@ -112,21 +112,24 @@ export function ProjectSidebar({
   );
 
   return (
-    <>
-      {isOpen && (
-        <div
-          aria-hidden="true"
-          onClick={onClose}
-          className="fixed inset-0 z-30 bg-black/50 md:hidden"
-        />
+    // Outer wrapper does the collapsing: it's the flex item whose `width`
+    // animates between `0` (closed) and `18rem` (open), so the canvas next
+    // to it in `editor-shell.tsx`'s flex row reflows to fill the freed
+    // space — sidebars push/share space with the canvas rather than
+    // floating on top of it. The inner `<aside>` stays a fixed `w-72` the
+    // whole time so its own content (tabs, rows) never squishes mid-animation,
+    // it's just progressively clipped by this wrapper's `overflow-hidden`.
+    <div
+      className={cn(
+        "h-full shrink-0 overflow-hidden transition-all duration-200 ease-out",
+        isOpen ? "mr-4 w-72" : "mr-0 w-0",
       )}
-
+    >
       <aside
         aria-hidden={!isOpen}
         inert={!isOpen}
         className={cn(
-          "fixed top-14 bottom-0 left-0 z-40 flex w-72 flex-col border-r border-surface-border bg-surface/95 shadow-2xl backdrop-blur-sm transition-transform duration-200 ease-out",
-          isOpen ? "translate-x-0" : "-translate-x-full",
+          "flex h-full w-72 flex-col rounded-2xl border border-surface-border bg-surface/95 shadow-2xl backdrop-blur-sm",
           className,
         )}
       >
@@ -216,6 +219,6 @@ export function ProjectSidebar({
           </Button>
         </div>
       </aside>
-    </>
+    </div>
   );
 }

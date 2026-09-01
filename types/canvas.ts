@@ -152,3 +152,16 @@ export interface CanvasEdgeData extends Record<string, unknown> {
  * fall back to an empty label.
  */
 export type CanvasEdge = Edge<CanvasEdgeData, "canvasEdge">;
+
+/**
+ * The full canvas state persisted outside Liveblocks Storage, per
+ * `21-canvas-autosave.md` — the shape uploaded to Vercel Blob by
+ * `PUT /api/projects/[projectId]/canvas` and read back by its `GET`
+ * counterpart. Mirrors `storage.flow`'s `nodes`/`edges` (see
+ * `liveblocks.config.ts`), just as a plain array snapshot instead of the
+ * `LiveMap`s `useLiveblocksFlow` owns live.
+ */
+export interface CanvasSnapshot {
+  nodes: CanvasNode[];
+  edges: CanvasEdge[];
+}

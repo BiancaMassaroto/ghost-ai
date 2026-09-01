@@ -33,6 +33,14 @@ export interface NodeSize {
 }
 
 /**
+ * Floor a node can be resized down to via `NodeResizer` (`14-node-editing.md`)
+ * — below every shape's own `DEFAULT_NODE_SIZES` entry, but still large
+ * enough for the centered label to stay legible regardless of shape.
+ */
+export const MIN_NODE_WIDTH = 60;
+export const MIN_NODE_HEIGHT = 40;
+
+/**
  * Default size for a newly created node of each shape, per
  * `12-shape-panel.md` — rectangle wider than tall, circle square, diamond
  * sized larger than the others since its rotated bounding box otherwise
@@ -125,8 +133,22 @@ export interface CanvasNodeData extends Record<string, unknown> {
 export type CanvasNode = Node<CanvasNodeData, "canvasNode">;
 
 /**
- * A canvas edge — a React Flow `Edge` tagged `"canvasEdge"`. No edge data or
- * custom edge component exists yet, per the scope limits in
- * `11-base-canvas.md`.
+ * Data carried by every canvas edge, per `16-edge-behavior.md`: just an
+ * inline-editable label. `Record<string, unknown>` is satisfied since
+ * `label` is JSON-serializable — required for the data to sync through
+ * Liveblocks Storage (`@liveblocks/react-flow`), same as `CanvasNodeData`.
  */
-export type CanvasEdge = Edge<Record<string, never>, "canvasEdge">;
+export interface CanvasEdgeData extends Record<string, unknown> {
+  label: string;
+}
+
+/**
+ * A canvas edge — a React Flow `Edge` typed with `CanvasEdgeData` and tagged
+ * `"canvasEdge"`. Rendered by the `CanvasEdge` component
+ * (`components/editor/canvas/canvas-edge.tsx`), registered as `edgeTypes`
+ * in `canvas.tsx`, per `16-edge-behavior.md`. `data` stays optional at the
+ * type level (inherited from `EdgeBase`) since an edge created via
+ * `onConnect` has no `data` until a label is first saved — renderers must
+ * fall back to an empty label.
+ */
+export type CanvasEdge = Edge<CanvasEdgeData, "canvasEdge">;

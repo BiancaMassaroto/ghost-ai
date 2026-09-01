@@ -119,9 +119,19 @@ export function ProjectSidebar({
     // floating on top of it. The inner `<aside>` stays a fixed `w-72` the
     // whole time so its own content (tabs, rows) never squishes mid-animation,
     // it's just progressively clipped by this wrapper's `overflow-hidden`.
+    //
+    // Deliberately no `h-full` here: `height: 100%` only resolves against a
+    // *definite* ancestor height, and this wrapper's own height comes from
+    // `editor-shell.tsx`'s row being sized by flex-grow, not an explicit
+    // CSS height — the same class of bug `11-base-canvas.md` hit with React
+    // Flow's own sizing. Leaving `height` at its default `auto` lets the
+    // row's default `align-items: stretch` size it instead (the same
+    // mechanism the canvas panel already relies on via `flex-1`, with no
+    // height class of its own), which isn't subject to that resolution
+    // problem — omitting `h-full` was the fix, not a placeholder for one.
     <div
       className={cn(
-        "h-full shrink-0 overflow-hidden transition-all duration-200 ease-out",
+        "shrink-0 overflow-hidden transition-all duration-200 ease-out",
         isOpen ? "mr-4 w-72" : "mr-0 w-0",
       )}
     >

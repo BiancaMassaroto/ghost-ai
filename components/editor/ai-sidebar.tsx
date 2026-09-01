@@ -24,10 +24,13 @@ interface AiSidebarProps {
 export function AiSidebar({ isOpen, onClose, className }: AiSidebarProps) {
   return (
     // See `ProjectSidebar` for why the width-animating collapse lives on
-    // this outer wrapper while the inner `<aside>` stays a fixed `w-96`.
+    // this outer wrapper while the inner `<aside>` stays a fixed `w-96` —
+    // including why there's deliberately no `h-full` here (it doesn't
+    // resolve against this row's flex-grow height; the default
+    // `align-items: stretch` does the sizing instead).
     <div
       className={cn(
-        "h-full shrink-0 overflow-hidden transition-all duration-200 ease-out",
+        "shrink-0 overflow-hidden transition-all duration-200 ease-out",
         isOpen ? "ml-4 w-96" : "ml-0 w-0",
       )}
     >

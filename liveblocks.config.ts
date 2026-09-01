@@ -11,7 +11,7 @@ declare global {
       // Cursor position on the canvas; `null` when the pointer isn't over it.
       cursor: { x: number; y: number } | null;
       // Whether this user's AI request is currently generating.
-      isThinking: boolean;
+      thinking: boolean;
     };
 
     // The Storage tree for the room, for useMutation, useStorage, etc.

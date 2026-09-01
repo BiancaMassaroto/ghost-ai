@@ -2,7 +2,16 @@
 
 import "@xyflow/react/dist/style.css";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import {
   Background,
   BackgroundVariant,
@@ -13,7 +22,7 @@ import {
   useReactFlow,
 } from "@xyflow/react";
 import { useLiveblocksFlow } from "@liveblocks/react-flow";
-import { useCanRedo, useCanUndo, useRedo, useUndo } from "@liveblocks/react";
+import { useCanRedo, useCanUndo, useRedo, useUndo, useUpdateMyPresence } from "@liveblocks/react";
 
 import { CanvasControlBar } from "@/components/editor/canvas/canvas-control-bar";
 import { CanvasEdge as CanvasEdgeRenderer } from "@/components/editor/canvas/canvas-edge";
@@ -26,16 +35,20 @@ import {
   CanvasNodeActionsProvider,
   type CanvasNodeActions,
 } from "@/components/editor/canvas/canvas-node-context";
+import { LiveCursors } from "@/components/editor/canvas/live-cursors";
+import { PresenceAvatars } from "@/components/editor/canvas/presence-avatars";
 import { ShapePanel } from "@/components/editor/canvas/shape-panel";
 import { StarterTemplatesModal } from "@/components/editor/starter-templates-modal";
 import type { CanvasTemplate } from "@/components/editor/starter-templates";
 import { ZOOM_ANIMATION_DURATION_MS, useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import { useCanvasAutosave, type CanvasSaveStatus } from "@/hooks/use-canvas-autosave";
 import { generateNodeId } from "@/lib/canvas-node";
 import {
   DEFAULT_NODE_COLOR,
   SHAPE_DRAG_MIME_TYPE,
   type CanvasEdge,
   type CanvasNode,
+  type CanvasSnapshot,
   type NodeColorId,
   type ShapeDragPayload,
 } from "@/types/canvas";
@@ -70,9 +83,19 @@ const defaultEdgeOptions = {
 const NARROW_CANVAS_WIDTH_PX = 640;
 
 interface CanvasFlowProps {
+  /** The project's database ID — also the Liveblocks room ID and the canvas
+   * autosave/load API route's `[projectId]`, per `21-canvas-autosave.md`. */
+  roomId: string;
   /** Whether the starter templates modal is open — owned by `EditorShell`, threaded down through `CanvasRoom`/`Canvas` since the navbar button that opens it lives outside this component's own tree. */
   isTemplatesModalOpen: boolean;
   onTemplatesModalOpenChange: (open: boolean) => void;
+  /** Reports the current autosave status up to `EditorShell` (for the
+   * navbar's save indicator) — the reverse of the templates-modal prop
+   * above, but the same "thread it as a plain prop through this chain"
+   * convention, since `EditorNavbar` has no access to Liveblocks state on
+   * its own (`RoomProvider` is mounted locally in `CanvasRoom`, not at the
+   * root). */
+  onSaveStatusChange: (status: CanvasSaveStatus) => void;
 }
 
 /**
@@ -82,7 +105,12 @@ interface CanvasFlowProps {
  * and `<ReactFlow>` only creates one for its own descendants, not for the
  * component that renders it.
  */
-function CanvasFlow({ isTemplatesModalOpen, onTemplatesModalOpenChange }: CanvasFlowProps) {
+function CanvasFlow({
+  roomId,
+  isTemplatesModalOpen,
+  onTemplatesModalOpenChange,
+  onSaveStatusChange,
+}: CanvasFlowProps) {
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect, onDelete } =
     useLiveblocksFlow<CanvasNode, CanvasEdge>({
       suspense: true,
@@ -94,13 +122,98 @@ function CanvasFlow({ isTemplatesModalOpen, onTemplatesModalOpenChange }: Canvas
   const nodesRef = useRef(nodes);
   const edgesRef = useRef(edges);
 
-  useEffect(() => {
+  // `useLayoutEffect`, not `useEffect` — synced *before* the browser can run
+  // any other queued task, including a pending `fetch().then()` continuation
+  // (e.g. the saved-snapshot load below). A passive `useEffect` is
+  // deliberately deferred past paint, which left a real window where that
+  // async callback could still read a stale ref even though `nodes`/`edges`
+  // had already updated (a collaborator's change landing in that gap).
+  useLayoutEffect(() => {
     nodesRef.current = nodes;
   }, [nodes]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     edgesRef.current = edges;
   }, [edges]);
+
+  // Whether it's safe to autosave yet, per `21-canvas-autosave.md`'s
+  // follow-up fix: a room that came up empty might just be a fresh project,
+  // or might have a real saved snapshot that hasn't loaded yet — those look
+  // identical from `nodes`/`edges` alone. Starting "ready" only when the
+  // room already has content (no load is even attempted, see below) lets
+  // autosave run immediately in that case; a room that came up empty stays
+  // "pending" (autosave disabled) until the load actually resolves, and
+  // becomes "failed" — permanently blocking autosave, not just delaying it —
+  // if the saved snapshot exists but couldn't be read. Otherwise a failed
+  // *read* (network blip, expired credentials, corrupt blob) would look
+  // exactly like "nothing was ever saved," and the very next edit would
+  // autosave that empty-derived state right over the real snapshot.
+  const [canvasLoadStatus, setCanvasLoadStatus] = useState<"pending" | "ready" | "failed">(() =>
+    nodes.length > 0 || edges.length > 0 ? "ready" : "pending",
+  );
+
+  // Loads the project's saved canvas snapshot on mount — but only if the
+  // room came up empty (no nodes or edges), so an already-active
+  // collaborative session is never overwritten by a stale blob. Runs once
+  // per room: guarded by `hasAttemptedLoad`, not by an empty dependency
+  // array alone, since `nodesRef`/`edgesRef` (checked, not `nodes`/`edges`
+  // themselves, so this doesn't re-run on every canvas change).
+  const hasAttemptedLoad = useRef(false);
+
+  useEffect(() => {
+    if (hasAttemptedLoad.current) return;
+    hasAttemptedLoad.current = true;
+
+    if (nodesRef.current.length > 0 || edgesRef.current.length > 0) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const response = await fetch(`/api/projects/${roomId}/canvas`);
+        // A non-2xx response (e.g. the API's 502 for an unreadable saved
+        // snapshot) is a real failure, not "nothing saved" — must not fall
+        // through to `canvasLoadStatus: "ready"` below.
+        if (!response.ok) throw new Error("Failed to load saved canvas");
+
+        const body = (await response.json()) as { canvas: CanvasSnapshot | null };
+        if (cancelled) return;
+
+        // Re-check right before applying — another participant may have
+        // added something while this request was in flight.
+        if (body.canvas && nodesRef.current.length === 0 && edgesRef.current.length === 0) {
+          onNodesChange(body.canvas.nodes.map((item) => ({ type: "add" as const, item })));
+          onEdgesChange(body.canvas.edges.map((item) => ({ type: "add" as const, item })));
+        }
+
+        setCanvasLoadStatus("ready");
+      } catch {
+        if (!cancelled) setCanvasLoadStatus("failed");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [roomId, onNodesChange, onEdgesChange]);
+
+  // Debounced autosave of the live canvas state, per
+  // `21-canvas-autosave.md` — disabled until `canvasLoadStatus` says it's
+  // safe (see above). Reports its status up to `EditorShell` so the navbar
+  // can show a save indicator; a load failure is folded into that same
+  // "error" status, since it's the same "the canvas isn't safely synced"
+  // situation from the user's point of view.
+  const saveStatus = useCanvasAutosave({
+    projectId: roomId,
+    nodes,
+    edges,
+    enabled: canvasLoadStatus === "ready",
+  });
+  const displaySaveStatus = canvasLoadStatus === "failed" ? "error" : saveStatus;
+
+  useEffect(() => {
+    onSaveStatusChange(displaySaveStatus);
+  }, [displaySaveStatus, onSaveStatusChange]);
 
   // Liveblocks' own undo/redo history, per `17-canvas-ergonomics.md` — every
   // mutation on `storage.flow` (node/edge add, move, resize, label/color
@@ -152,6 +265,23 @@ function CanvasFlow({ isTemplatesModalOpen, onTemplatesModalOpenChange }: Canvas
     // owner of `storage.flow`, per the architecture decision in
     // `progress-tracker.md`.
     onNodesChange([{ type: "add", item: newNode }]);
+  }
+
+  // Broadcasts this user's cursor position via Liveblocks presence, per
+  // `19-presence-avatars-cursor.md` — converted to flow coordinates (the
+  // same `screenToFlowPosition` conversion `handleDrop` below already uses)
+  // so `LiveCursors` can render it inside `<ViewportPortal>` and have it
+  // pan/zoom with the canvas like a node position would.
+  const updateMyPresence = useUpdateMyPresence();
+
+  function handleMouseMove(event: ReactMouseEvent<HTMLDivElement>) {
+    updateMyPresence({
+      cursor: screenToFlowPosition({ x: event.clientX, y: event.clientY }),
+    });
+  }
+
+  function handleMouseLeave() {
+    updateMyPresence({ cursor: null });
   }
 
   function handleDragOver(event: DragEvent<HTMLDivElement>) {
@@ -303,6 +433,8 @@ function CanvasFlow({ isTemplatesModalOpen, onTemplatesModalOpenChange }: Canvas
           onDelete={onDelete}
           onDragOver={handleDragOver}
           onDrop={handleDrop}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
           connectionMode={ConnectionMode.Loose}
           fitView
           colorMode="dark"
@@ -320,6 +452,14 @@ function CanvasFlow({ isTemplatesModalOpen, onTemplatesModalOpenChange }: Canvas
               React Flow's hardcoded defaults, so the pattern stays subtle and
               on-brand against the dark canvas. */}
           <Background variant={BackgroundVariant.Dots} color="var(--border-default)" />
+          {/* Other participants' live cursors, per
+              `19-presence-avatars-cursor.md` — rendered inside React Flow's
+              own pan/zoom viewport so they stay anchored to canvas content. */}
+          <LiveCursors />
+          {/* Top-right presence group (collaborator avatars + this user's
+              own `<UserButton>`) — separate from `EditorNavbar`, which is
+              untouched by this unit. */}
+          <PresenceAvatars />
           <ShapePanel onAddShape={handleAddShape} />
           {/* Bottom-left, per `17-canvas-ergonomics.md` — the minimap this
               replaced (previously bottom-right) has been removed. Switches
@@ -347,6 +487,8 @@ function CanvasFlow({ isTemplatesModalOpen, onTemplatesModalOpenChange }: Canvas
 }
 
 interface CanvasProps {
+  /** The project's database ID — see `CanvasFlowProps.roomId`. */
+  roomId: string;
   /**
    * Starter templates modal open state, per `18-starter-template.md` —
    * owned by `EditorShell` (the navbar button that opens it lives outside
@@ -356,6 +498,8 @@ interface CanvasProps {
    */
   isTemplatesModalOpen: boolean;
   onTemplatesModalOpenChange: (open: boolean) => void;
+  /** See `CanvasFlowProps.onSaveStatusChange`. */
+  onSaveStatusChange: (status: CanvasSaveStatus) => void;
 }
 
 /**
@@ -365,12 +509,19 @@ interface CanvasProps {
  * inside a `ClientSideSuspense` boundary (see `CanvasRoom`), so `suspense:
  * true` is safe here — `nodes`/`edges` are never `null`.
  */
-export function Canvas({ isTemplatesModalOpen, onTemplatesModalOpenChange }: CanvasProps) {
+export function Canvas({
+  roomId,
+  isTemplatesModalOpen,
+  onTemplatesModalOpenChange,
+  onSaveStatusChange,
+}: CanvasProps) {
   return (
     <ReactFlowProvider>
       <CanvasFlow
+        roomId={roomId}
         isTemplatesModalOpen={isTemplatesModalOpen}
         onTemplatesModalOpenChange={onTemplatesModalOpenChange}
+        onSaveStatusChange={onSaveStatusChange}
       />
     </ReactFlowProvider>
   );

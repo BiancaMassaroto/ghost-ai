@@ -11,6 +11,7 @@ import { ProjectSidebar } from "@/components/editor/project-sidebar";
 import { ShareDialog } from "@/components/editor/share-dialog";
 import { useProjectActions } from "@/hooks/use-project-actions";
 import { useShareDialog } from "@/hooks/use-share-dialog";
+import type { CanvasSaveStatus } from "@/hooks/use-canvas-autosave";
 import type { Project } from "@/types/project";
 
 interface EditorShellProps {
@@ -38,6 +39,10 @@ export function EditorShell({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isAiSidebarOpen, setIsAiSidebarOpen] = useState(false);
   const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false);
+  // Owned here (not inside the canvas subtree) so `EditorNavbar`'s save
+  // indicator can read it — `CanvasFlow` reports status up via
+  // `onSaveStatusChange`, per `21-canvas-autosave.md`.
+  const [saveStatus, setSaveStatus] = useState<CanvasSaveStatus>("idle");
   const actions = useProjectActions({ activeProjectId: activeProject?.id });
   const share = useShareDialog({
     projectId: activeProject?.id ?? "",
@@ -54,6 +59,7 @@ export function EditorShell({
         onToggleAiSidebar={() => setIsAiSidebarOpen((open) => !open)}
         onShare={share.open}
         onOpenTemplates={() => setIsTemplatesModalOpen(true)}
+        saveStatus={activeProject ? saveStatus : undefined}
       />
 
       {/* A real flex row, not overlays — `ProjectSidebar`/`AiSidebar` each
@@ -78,6 +84,7 @@ export function EditorShell({
               roomId={activeProject.id}
               isTemplatesModalOpen={isTemplatesModalOpen}
               onTemplatesModalOpenChange={setIsTemplatesModalOpen}
+              onSaveStatusChange={setSaveStatus}
             />
           ) : (
             <EditorHome onNewProject={actions.openCreateDialog} />

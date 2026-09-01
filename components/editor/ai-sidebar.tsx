@@ -1,8 +1,14 @@
 "use client";
 
-import { Bot, Sparkles, X } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
+import { AiArchitectTab } from "@/components/editor/ai-architect-tab";
+import { AiSidebarHeader } from "@/components/editor/ai-sidebar-header";
+import { SpecsTab } from "@/components/editor/specs-tab";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 interface AiSidebarProps {
@@ -14,12 +20,14 @@ interface AiSidebarProps {
 }
 
 /**
- * Right-side placeholder for the future AI chat panel, per
- * `08-editor-workspace-shell.md`. Mirrors `ProjectSidebar`'s collapsing
- * push-panel pattern, anchored to the right edge instead of the left. No AI
- * chat logic yet — chrome and open/close state only, and the copy below is
- * explicit about that so the placeholder can't be mistaken for a working
- * chat surface.
+ * Right-side floating chat sidebar, per `20-ai-sidebar-shell.md`. Open/close
+ * state is controlled by the parent (`EditorShell`) — this component owns
+ * only the sidebar's own UI structure: the header, the AI Architect/Specs
+ * tabs, and their bodies (each split into its own component below).
+ * Mirrors `ProjectSidebar`'s collapsing push-panel pattern, anchored to the
+ * right edge instead of the left. Still no Liveblocks or AI generation
+ * logic — `AiArchitectTab` and `SpecsTab` are UI-only, per the spec's scope
+ * limits.
  */
 export function AiSidebar({ isOpen, onClose, className }: AiSidebarProps) {
   return (
@@ -42,53 +50,41 @@ export function AiSidebar({ isOpen, onClose, className }: AiSidebarProps) {
           className,
         )}
       >
-        <div className="flex h-14 shrink-0 items-center justify-between border-b border-surface-border px-4">
-          <div className="flex flex-col leading-tight">
-            <span className="text-sm font-semibold text-copy-primary">
-              AI Copilot
-            </span>
-            <span className="text-xs text-copy-muted">Placeholder panel</span>
-          </div>
+        <AiSidebarHeader onClose={onClose} />
 
-          <div className="flex items-center gap-1">
-            <Sparkles className="h-4 w-4 text-ai-text" />
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Close AI sidebar"
-              onClick={onClose}
+        <Tabs
+          defaultValue="architect"
+          className="flex flex-1 flex-col overflow-hidden px-4 pt-3"
+        >
+          <TabsList className="w-full rounded-full bg-subtle p-1">
+            <TabsTrigger
+              value="architect"
+              className="flex-1 rounded-full text-copy-muted data-active:bg-accent data-active:text-accent-foreground"
             >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+              AI Architect
+            </TabsTrigger>
+            <TabsTrigger
+              value="specs"
+              className="flex-1 rounded-full text-copy-muted data-active:bg-accent data-active:text-accent-foreground"
+            >
+              Specs
+            </TabsTrigger>
+          </TabsList>
 
-        <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
-          <div className="flex gap-3 rounded-2xl border border-surface-border bg-elevated p-4">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-ai/15 text-ai-text">
-              <Bot className="h-4 w-4" />
-            </span>
-            <div className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-copy-primary">
-                Chat surface pending
-              </span>
-              <span className="text-sm text-copy-secondary">
-                The toggle is wired. Messaging and generation are
-                intentionally out of scope here.
-              </span>
-            </div>
-          </div>
-        </div>
+          <TabsContent
+            value="architect"
+            className="flex flex-1 flex-col overflow-hidden pb-4"
+          >
+            <AiArchitectTab />
+          </TabsContent>
 
-        <div className="shrink-0 border-t border-surface-border px-4 py-4">
-          <span className="text-xs font-medium uppercase tracking-wider text-copy-faint">
-            Future hooks
-          </span>
-          <p className="mt-1 text-sm text-copy-secondary">
-            Prompt composer, run status, and architecture guidance will
-            attach to this sidebar.
-          </p>
-        </div>
+          <TabsContent
+            value="specs"
+            className="flex flex-1 flex-col overflow-hidden pb-4"
+          >
+            <SpecsTab />
+          </TabsContent>
+        </Tabs>
       </aside>
     </div>
   );

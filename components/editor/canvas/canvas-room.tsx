@@ -6,6 +6,7 @@ import { Loader2, WifiOff } from "lucide-react";
 import { ErrorBoundary } from "react-error-boundary";
 
 import { Canvas } from "@/components/editor/canvas/canvas";
+import type { CanvasSaveStatus } from "@/hooks/use-canvas-autosave";
 
 interface CanvasRoomProps {
   /** The project's database ID — also the Liveblocks room ID, per the
@@ -14,6 +15,9 @@ interface CanvasRoomProps {
   /** Starter templates modal open state, per `18-starter-template.md` — see `Canvas`'s own prop doc for why this is threaded through rather than owned here. */
   isTemplatesModalOpen: boolean;
   onTemplatesModalOpenChange: (open: boolean) => void;
+  /** Reports canvas autosave status up to `EditorShell`, per
+   * `21-canvas-autosave.md` — see `Canvas`'s own prop doc. */
+  onSaveStatusChange: (status: CanvasSaveStatus) => void;
 }
 
 /**
@@ -27,6 +31,7 @@ export function CanvasRoom({
   roomId,
   isTemplatesModalOpen,
   onTemplatesModalOpenChange,
+  onSaveStatusChange,
 }: CanvasRoomProps) {
   return (
     // `absolute inset-0` (not `h-full`) — React Flow measures its immediate
@@ -39,7 +44,7 @@ export function CanvasRoom({
       <LiveblocksProvider authEndpoint="/api/liveblocks-auth">
         <RoomProvider
           id={roomId}
-          initialPresence={{ cursor: null, isThinking: false }}
+          initialPresence={{ cursor: null, thinking: false }}
           initialStorage={{
             flow: new LiveObject({ nodes: new LiveMap(), edges: new LiveMap() }),
           }}
@@ -63,8 +68,10 @@ export function CanvasRoom({
               }
             >
               <Canvas
+                roomId={roomId}
                 isTemplatesModalOpen={isTemplatesModalOpen}
                 onTemplatesModalOpenChange={onTemplatesModalOpenChange}
+                onSaveStatusChange={onSaveStatusChange}
               />
             </ClientSideSuspense>
           </ErrorBoundary>

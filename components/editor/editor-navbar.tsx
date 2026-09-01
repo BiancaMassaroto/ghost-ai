@@ -1,10 +1,48 @@
 "use client";
 
 import { UserButton } from "@clerk/nextjs";
-import { LayoutTemplate, PanelLeftClose, PanelLeftOpen, Share2, Sparkles } from "lucide-react";
+import {
+  AlertCircle,
+  Check,
+  LayoutTemplate,
+  Loader2,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Share2,
+  Sparkles,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import type { CanvasSaveStatus } from "@/hooks/use-canvas-autosave";
 import { cn } from "@/lib/utils";
+
+/**
+ * Small pill next to the room-scoped actions showing the canvas autosave
+ * state, per `21-canvas-autosave.md`. Not an interactive button (autosave
+ * has no manual trigger) — purely a status readout, styled to match the
+ * other pill chrome in this navbar.
+ */
+function SaveStatusIndicator({ status }: { status: CanvasSaveStatus }) {
+  if (status === "idle") return null;
+
+  const content = {
+    saving: { icon: <Loader2 className="h-3.5 w-3.5 animate-spin" />, label: "Saving…" },
+    saved: { icon: <Check className="h-3.5 w-3.5 text-brand" />, label: "Saved" },
+    error: { icon: <AlertCircle className="h-3.5 w-3.5 text-destructive" />, label: "Save failed" },
+  }[status];
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-1.5 rounded-full border border-surface-border bg-surface px-3 py-1.5 text-xs",
+        status === "error" ? "text-destructive" : "text-copy-muted"
+      )}
+    >
+      {content.icon}
+      {content.label}
+    </div>
+  );
+}
 
 interface EditorNavbarProps {
   /** Whether the project sidebar is currently open. Drives the toggle icon. */
@@ -25,6 +63,10 @@ interface EditorNavbarProps {
   onShare?: () => void;
   /** Called when the Starter Templates button is pressed. */
   onOpenTemplates?: () => void;
+  /** Current canvas autosave status, per `21-canvas-autosave.md`. Undefined
+   * at `/editor` (no active room), same room-scoped visibility rule as the
+   * Share/Templates/AI buttons. */
+  saveStatus?: CanvasSaveStatus;
   className?: string;
 }
 
@@ -36,6 +78,7 @@ export function EditorNavbar({
   onToggleAiSidebar,
   onShare,
   onOpenTemplates,
+  saveStatus,
   className,
 }: EditorNavbarProps) {
   return (
@@ -73,6 +116,7 @@ export function EditorNavbar({
       <div className="flex shrink-0 items-center gap-2">
         {projectName && (
           <>
+            {saveStatus && <SaveStatusIndicator status={saveStatus} />}
             <Button variant="outline" size="sm" onClick={onOpenTemplates} className="gap-1.5">
               <LayoutTemplate className="h-4 w-4" />
               Templates

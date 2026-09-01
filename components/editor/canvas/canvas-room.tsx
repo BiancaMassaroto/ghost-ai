@@ -11,6 +11,9 @@ interface CanvasRoomProps {
   /** The project's database ID — also the Liveblocks room ID, per the
    * single-identifier decision in `progress-tracker.md`. */
   roomId: string;
+  /** Starter templates modal open state, per `18-starter-template.md` — see `Canvas`'s own prop doc for why this is threaded through rather than owned here. */
+  isTemplatesModalOpen: boolean;
+  onTemplatesModalOpenChange: (open: boolean) => void;
 }
 
 /**
@@ -20,7 +23,11 @@ interface CanvasRoomProps {
  * exactly what that route reads), `RoomProvider` joins the project's room,
  * and the real canvas only renders once Storage is ready.
  */
-export function CanvasRoom({ roomId }: CanvasRoomProps) {
+export function CanvasRoom({
+  roomId,
+  isTemplatesModalOpen,
+  onTemplatesModalOpenChange,
+}: CanvasRoomProps) {
   return (
     // `absolute inset-0` (not `h-full`) — React Flow measures its immediate
     // parent's rendered box directly, and only `inset-0` against the
@@ -55,7 +62,10 @@ export function CanvasRoom({ roomId }: CanvasRoomProps) {
                 </div>
               }
             >
-              <Canvas />
+              <Canvas
+                isTemplatesModalOpen={isTemplatesModalOpen}
+                onTemplatesModalOpenChange={onTemplatesModalOpenChange}
+              />
             </ClientSideSuspense>
           </ErrorBoundary>
         </RoomProvider>

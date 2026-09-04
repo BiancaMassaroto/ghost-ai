@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentIdentity, checkProjectAccess } from "@/lib/project-access";
 import { readJsonBody } from "@/lib/api-request";
-import { liveblocks, getUserColor } from "@/lib/liveblocks";
+import { liveblocks, getUserColor, ensureAiStatusFeed, ensureAiChatFeed } from "@/lib/liveblocks";
 
 /**
  * POST /api/liveblocks-auth — issues a Liveblocks session (ID token) for the
@@ -41,6 +41,19 @@ export async function POST(request: NextRequest) {
   await liveblocks.getOrCreateRoom(roomId, {
     defaultAccesses: ["room:write"],
   });
+
+  // Same "create or reuse" idiom, for the room's shared AI status feed, per
+  // `24-ai-presence-state.md` — done here (not lazily on first AI
+  // generation) so the AI sidebar's `useFeedMessages` subscription never has
+  // to race the feed not existing yet.
+  await ensureAiStatusFeed(roomId);
+
+  // Same idiom again, for the room's shared collaborative chat feed
+  // (`ai-chat`, per `25-sidebar-chat-feed.md`) — a separate feed from
+  // `ai-status-feed` above, so the AI sidebar's chat subscription
+  // (`hooks/use-ai-chat-feed.ts`) never has to race it not existing yet
+  // either.
+  await ensureAiChatFeed(roomId);
 
   const { status, body } = await liveblocks.identifyUser(identity.userId, {
     userInfo: {

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { LiveMap, LiveObject } from "@liveblocks/client";
+import { LiveblocksProvider, RoomProvider } from "@liveblocks/react";
 
 import { AiSidebar } from "@/components/editor/ai-sidebar";
 import { CanvasRoom } from "@/components/editor/canvas/canvas-room";
@@ -78,23 +80,46 @@ export function EditorShell({
           onDeleteProject={actions.openDeleteDialog}
         />
 
-        <div className="relative min-w-0 flex-1 overflow-hidden rounded-2xl border border-surface-border bg-surface">
-          {activeProject ? (
-            <CanvasRoom
-              roomId={activeProject.id}
-              isTemplatesModalOpen={isTemplatesModalOpen}
-              onTemplatesModalOpenChange={setIsTemplatesModalOpen}
-              onSaveStatusChange={setSaveStatus}
-            />
-          ) : (
-            <EditorHome onNewProject={actions.openCreateDialog} />
-          )}
-        </div>
+        {activeProject ? (
+          // A single `LiveblocksProvider`/`RoomProvider` wraps both the
+          // canvas panel and the AI sidebar, per `24-ai-presence-state.md` —
+          // see the Architecture Decision in `progress-tracker.md` for why
+          // this moved up from `CanvasRoom` (which mounted its own):
+          // `AiArchitectTab`'s `useIsAiThinking`/`useLatestAiStatus` and
+          // `AiSidebar` more generally need the same room's presence/feed
+          // data, and every Liveblocks hook needs a real `RoomProvider`
+          // ancestor to not throw. `AiSidebar` is therefore only ever
+          // mounted here, inside the room — matching `EditorNavbar`'s
+          // existing rule that its own toggle button is room-scoped too.
+          <LiveblocksProvider authEndpoint="/api/liveblocks-auth">
+            <RoomProvider
+              id={activeProject.id}
+              initialPresence={{ cursor: null, thinking: false }}
+              initialStorage={{
+                flow: new LiveObject({ nodes: new LiveMap(), edges: new LiveMap() }),
+              }}
+            >
+              <div className="relative min-w-0 flex-1 overflow-hidden rounded-2xl border border-surface-border bg-surface">
+                <CanvasRoom
+                  roomId={activeProject.id}
+                  isTemplatesModalOpen={isTemplatesModalOpen}
+                  onTemplatesModalOpenChange={setIsTemplatesModalOpen}
+                  onSaveStatusChange={setSaveStatus}
+                />
+              </div>
 
-        <AiSidebar
-          isOpen={isAiSidebarOpen}
-          onClose={() => setIsAiSidebarOpen(false)}
-        />
+              <AiSidebar
+                isOpen={isAiSidebarOpen}
+                onClose={() => setIsAiSidebarOpen(false)}
+                projectId={activeProject.id}
+              />
+            </RoomProvider>
+          </LiveblocksProvider>
+        ) : (
+          <div className="relative min-w-0 flex-1 overflow-hidden rounded-2xl border border-surface-border bg-surface">
+            <EditorHome onNewProject={actions.openCreateDialog} />
+          </div>
+        )}
       </div>
 
       <ProjectDialogs actions={actions} />

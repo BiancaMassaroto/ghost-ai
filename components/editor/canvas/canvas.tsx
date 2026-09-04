@@ -96,6 +96,20 @@ interface CanvasFlowProps {
    * its own (`RoomProvider` is mounted locally in `CanvasRoom`, not at the
    * root). */
   onSaveStatusChange: (status: CanvasSaveStatus) => void;
+  /** Reports the live canvas graph up to `EditorShell` whenever it changes —
+   * same "thread it as a plain prop through this chain" convention as
+   * `onSaveStatusChange`, needed so `SpecsTab` (outside this component's own
+   * `ReactFlowProvider`, which is what `useLiveblocksFlow` requires) can post
+   * the current graph to `POST /api/ai/spec` without reading Liveblocks
+   * Storage a second, parallel way. Per `27-spec-generation-flow.md`'s "the
+   * client posts its full in-memory canvas graph directly."
+   *
+   * The third argument, `isReady`, is `canvasLoadStatus === "ready"` (see
+   * below) — `false` for as long as a saved snapshot might still be
+   * loading, so a caller (`SpecsTab`) can disable spec generation until the
+   * graph it would post is actually the real one, not the room's transient
+   * empty-before-the-snapshot-lands state. */
+  onCanvasStateChange: (nodes: CanvasNode[], edges: CanvasEdge[], isReady: boolean) => void;
 }
 
 /**
@@ -110,6 +124,7 @@ function CanvasFlow({
   isTemplatesModalOpen,
   onTemplatesModalOpenChange,
   onSaveStatusChange,
+  onCanvasStateChange,
 }: CanvasFlowProps) {
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect, onDelete } =
     useLiveblocksFlow<CanvasNode, CanvasEdge>({
@@ -214,6 +229,10 @@ function CanvasFlow({
   useEffect(() => {
     onSaveStatusChange(displaySaveStatus);
   }, [displaySaveStatus, onSaveStatusChange]);
+
+  useEffect(() => {
+    onCanvasStateChange(nodes, edges, canvasLoadStatus === "ready");
+  }, [nodes, edges, canvasLoadStatus, onCanvasStateChange]);
 
   // Liveblocks' own undo/redo history, per `17-canvas-ergonomics.md` — every
   // mutation on `storage.flow` (node/edge add, move, resize, label/color
@@ -500,6 +519,8 @@ interface CanvasProps {
   onTemplatesModalOpenChange: (open: boolean) => void;
   /** See `CanvasFlowProps.onSaveStatusChange`. */
   onSaveStatusChange: (status: CanvasSaveStatus) => void;
+  /** See `CanvasFlowProps.onCanvasStateChange`. */
+  onCanvasStateChange: (nodes: CanvasNode[], edges: CanvasEdge[], isReady: boolean) => void;
 }
 
 /**
@@ -514,6 +535,7 @@ export function Canvas({
   isTemplatesModalOpen,
   onTemplatesModalOpenChange,
   onSaveStatusChange,
+  onCanvasStateChange,
 }: CanvasProps) {
   return (
     <ReactFlowProvider>
@@ -522,6 +544,7 @@ export function Canvas({
         isTemplatesModalOpen={isTemplatesModalOpen}
         onTemplatesModalOpenChange={onTemplatesModalOpenChange}
         onSaveStatusChange={onSaveStatusChange}
+        onCanvasStateChange={onCanvasStateChange}
       />
     </ReactFlowProvider>
   );

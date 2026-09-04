@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { LiveMap, LiveObject } from "@liveblocks/client";
 import { LiveblocksProvider, RoomProvider } from "@liveblocks/react";
 
@@ -14,6 +14,7 @@ import { ShareDialog } from "@/components/editor/share-dialog";
 import { useProjectActions } from "@/hooks/use-project-actions";
 import { useShareDialog } from "@/hooks/use-share-dialog";
 import type { CanvasSaveStatus } from "@/hooks/use-canvas-autosave";
+import type { CanvasEdge, CanvasNode } from "@/types/canvas";
 import type { Project } from "@/types/project";
 
 interface EditorShellProps {
@@ -45,6 +46,40 @@ export function EditorShell({
   // indicator can read it — `CanvasFlow` reports status up via
   // `onSaveStatusChange`, per `21-canvas-autosave.md`.
   const [saveStatus, setSaveStatus] = useState<CanvasSaveStatus>("idle");
+  // Same up-threading pattern, one level further: `SpecsTab` (inside
+  // `AiSidebar`, a sibling of the canvas subtree) needs the live canvas
+  // graph to post to `POST /api/ai/spec` — `CanvasFlow` reports it up via
+  // `onCanvasStateChange`. One `useState` for both arrays plus readiness
+  // (not three separate ones) so a single canvas change produces one
+  // re-render here, not several. `isReady` starts `false` — see
+  // `onCanvasStateChange`'s own doc in `canvas.tsx`: a saved snapshot may
+  // still be loading when this component first mounts, and `SpecsTab` must
+  // not be able to post that transient empty graph as if it were real.
+  const [canvasState, setCanvasState] = useState<{
+    nodes: CanvasNode[];
+    edges: CanvasEdge[];
+    isReady: boolean;
+  }>({
+    nodes: [],
+    edges: [],
+    isReady: false,
+  });
+  // Stable identity via `useCallback` (empty deps — `setCanvasState`'s own
+  // identity is already stable, per React's `useState` guarantee), not an
+  // inline arrow function at the `CanvasRoom` call site below: an inline
+  // arrow is a new reference every render, which re-triggers `CanvasFlow`'s
+  // reporting `useEffect` (it depends on this callback's identity), which
+  // calls `setCanvasState` again, which re-renders this component and
+  // creates yet another new inline arrow — an infinite "Maximum update
+  // depth exceeded" loop. `onSaveStatusChange` avoids this by passing
+  // `setSaveStatus` directly; this callback needs its own `useCallback`
+  // instead since it wraps two arguments into one state shape.
+  const handleCanvasStateChange = useCallback(
+    (nodes: CanvasNode[], edges: CanvasEdge[], isReady: boolean) => {
+      setCanvasState({ nodes, edges, isReady });
+    },
+    [],
+  );
   const actions = useProjectActions({ activeProjectId: activeProject?.id });
   const share = useShareDialog({
     projectId: activeProject?.id ?? "",
@@ -105,6 +140,7 @@ export function EditorShell({
                   isTemplatesModalOpen={isTemplatesModalOpen}
                   onTemplatesModalOpenChange={setIsTemplatesModalOpen}
                   onSaveStatusChange={setSaveStatus}
+                  onCanvasStateChange={handleCanvasStateChange}
                 />
               </div>
 
@@ -112,6 +148,9 @@ export function EditorShell({
                 isOpen={isAiSidebarOpen}
                 onClose={() => setIsAiSidebarOpen(false)}
                 projectId={activeProject.id}
+                canvasNodes={canvasState.nodes}
+                canvasEdges={canvasState.edges}
+                isCanvasReady={canvasState.isReady}
               />
             </RoomProvider>
           </LiveblocksProvider>

@@ -6,6 +6,7 @@ import { ErrorBoundary } from "react-error-boundary";
 
 import { Canvas } from "@/components/editor/canvas/canvas";
 import type { CanvasSaveStatus } from "@/hooks/use-canvas-autosave";
+import type { CanvasEdge, CanvasNode } from "@/types/canvas";
 
 interface CanvasRoomProps {
   /** The project's database ID — also the Liveblocks room ID, per the
@@ -17,6 +18,9 @@ interface CanvasRoomProps {
   /** Reports canvas autosave status up to `EditorShell`, per
    * `21-canvas-autosave.md` — see `Canvas`'s own prop doc. */
   onSaveStatusChange: (status: CanvasSaveStatus) => void;
+  /** Reports the live canvas graph up to `EditorShell`, so `SpecsTab` can
+   * post it to `POST /api/ai/spec` — see `Canvas`'s own prop doc. */
+  onCanvasStateChange: (nodes: CanvasNode[], edges: CanvasEdge[], isReady: boolean) => void;
 }
 
 /**
@@ -35,6 +39,7 @@ export function CanvasRoom({
   isTemplatesModalOpen,
   onTemplatesModalOpenChange,
   onSaveStatusChange,
+  onCanvasStateChange,
 }: CanvasRoomProps) {
   return (
     // `absolute inset-0` (not `h-full`) — React Flow measures its immediate
@@ -67,6 +72,7 @@ export function CanvasRoom({
             isTemplatesModalOpen={isTemplatesModalOpen}
             onTemplatesModalOpenChange={onTemplatesModalOpenChange}
             onSaveStatusChange={onSaveStatusChange}
+            onCanvasStateChange={onCanvasStateChange}
           />
         </ClientSideSuspense>
       </ErrorBoundary>

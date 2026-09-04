@@ -1,0 +1,18 @@
+/// Metadata for a generated project specification, per
+/// `28-spec-persistance-download.md`. The Markdown content itself lives in
+/// Vercel Blob (`specs/{projectId}/{specId}.md`, per
+/// `architecture-context.md`'s Storage Model) — this row only records where
+/// to find it, mirroring `Project.canvasJsonPath`'s metadata-only pattern
+/// from `21-canvas-autosave.md`. Pulled into its own model (rather than a
+/// single field on `Project`) because a project can accumulate multiple
+/// generated specs over time, one row per `generate-spec` run, not just the
+/// latest one.
+model ProjectSpec {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  filePath  String
+  createdAt DateTime @default(now())
+
+  @@index([projectId, createdAt])
+}

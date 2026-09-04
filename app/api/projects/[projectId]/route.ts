@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/api-auth";
 import { requireProjectOwner } from "@/lib/project-access";
 import { readJsonBody } from "@/lib/api-request";
+import { deleteProjectBlobs } from "@/lib/project-cleanup";
 
 interface RouteParams {
   params: Promise<{ projectId: string }>;
@@ -34,7 +35,18 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   return NextResponse.json({ project });
 }
 
-/** DELETE /api/projects/[projectId] — deletes a project. Owner-only. */
+/**
+ * DELETE /api/projects/[projectId] — deletes a project. Owner-only.
+ *
+ * Reads every blob this project owns (its canvas snapshot, every generated
+ * spec's Markdown) *before* deleting the row — `ProjectSpec`'s
+ * `onDelete: Cascade` removes those child rows as part of the same delete,
+ * so their `filePath`s must be read first or they're gone. `deleteProjectBlobs`
+ * (best-effort, not a durable retry workflow — see its own doc comment) then
+ * cleans up storage; the database delete happens regardless of whether that
+ * cleanup fully succeeded, since a Blob failure shouldn't block the project
+ * deletion the user asked for.
+ */
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   const auth = await requireUserId();
   if ("error" in auth) return auth.error;
@@ -42,6 +54,16 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   const { projectId } = await params;
   const access = await requireProjectOwner(projectId, auth.userId);
   if ("error" in access) return access.error;
+
+  const specs = await prisma.projectSpec.findMany({
+    where: { projectId },
+    select: { filePath: true },
+  });
+
+  await deleteProjectBlobs(
+    access.project.canvasJsonPath,
+    specs.map((spec) => spec.filePath),
+  );
 
   await prisma.project.delete({ where: { id: access.project.id } });
 

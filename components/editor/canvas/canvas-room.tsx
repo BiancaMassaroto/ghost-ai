@@ -1,7 +1,6 @@
 "use client";
 
-import { LiveMap, LiveObject } from "@liveblocks/client";
-import { ClientSideSuspense, LiveblocksProvider, RoomProvider } from "@liveblocks/react";
+import { ClientSideSuspense } from "@liveblocks/react";
 import { Loader2, WifiOff } from "lucide-react";
 import { ErrorBoundary } from "react-error-boundary";
 
@@ -21,11 +20,15 @@ interface CanvasRoomProps {
 }
 
 /**
- * Sets up the Liveblocks room the canvas lives in, per `11-base-canvas.md`:
- * `LiveblocksProvider` authenticates against the existing
- * `/api/liveblocks-auth` route (its default request body, `{ room }`, is
- * exactly what that route reads), `RoomProvider` joins the project's room,
- * and the real canvas only renders once Storage is ready.
+ * Renders the real canvas once the room's Storage is ready, per
+ * `11-base-canvas.md`. The `LiveblocksProvider`/`RoomProvider` this used to
+ * mount itself now live one level up, in `EditorShell` — per
+ * `24-ai-presence-state.md`, the AI sidebar (a sibling of this component,
+ * not a descendant) needs the same room's presence/feed data, so a single
+ * `RoomProvider` now wraps both instead of each Liveblocks consumer mounting
+ * its own (see the Architecture Decision in `progress-tracker.md`). This
+ * component only owns what's specific to the canvas surface itself: the
+ * connection-error fallback and the Storage-loading suspense boundary.
  */
 export function CanvasRoom({
   roomId,
@@ -41,42 +44,32 @@ export function CanvasRoom({
     // flex chain and trigger React Flow's "parent container needs a width
     // and a height" error.
     <div className="absolute inset-0">
-      <LiveblocksProvider authEndpoint="/api/liveblocks-auth">
-        <RoomProvider
-          id={roomId}
-          initialPresence={{ cursor: null, thinking: false }}
-          initialStorage={{
-            flow: new LiveObject({ nodes: new LiveMap(), edges: new LiveMap() }),
-          }}
+      <ErrorBoundary
+        fallback={
+          <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-center">
+            <WifiOff className="h-8 w-8 text-copy-muted" />
+            <p className="max-w-sm text-sm text-copy-secondary">
+              Couldn&apos;t connect to the canvas. Check your connection
+              and try reloading.
+            </p>
+          </div>
+        }
+      >
+        <ClientSideSuspense
+          fallback={
+            <div className="flex h-full w-full items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-copy-muted" />
+            </div>
+          }
         >
-          <ErrorBoundary
-            fallback={
-              <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-center">
-                <WifiOff className="h-8 w-8 text-copy-muted" />
-                <p className="max-w-sm text-sm text-copy-secondary">
-                  Couldn&apos;t connect to the canvas. Check your connection
-                  and try reloading.
-                </p>
-              </div>
-            }
-          >
-            <ClientSideSuspense
-              fallback={
-                <div className="flex h-full w-full items-center justify-center">
-                  <Loader2 className="h-6 w-6 animate-spin text-copy-muted" />
-                </div>
-              }
-            >
-              <Canvas
-                roomId={roomId}
-                isTemplatesModalOpen={isTemplatesModalOpen}
-                onTemplatesModalOpenChange={onTemplatesModalOpenChange}
-                onSaveStatusChange={onSaveStatusChange}
-              />
-            </ClientSideSuspense>
-          </ErrorBoundary>
-        </RoomProvider>
-      </LiveblocksProvider>
+          <Canvas
+            roomId={roomId}
+            isTemplatesModalOpen={isTemplatesModalOpen}
+            onTemplatesModalOpenChange={onTemplatesModalOpenChange}
+            onSaveStatusChange={onSaveStatusChange}
+          />
+        </ClientSideSuspense>
+      </ErrorBoundary>
     </div>
   );
 }

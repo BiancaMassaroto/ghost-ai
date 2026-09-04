@@ -3,6 +3,7 @@
 import type { LiveblocksFlow } from "@liveblocks/react-flow";
 
 import type { CanvasEdge, CanvasNode } from "@/types/canvas";
+import type { AiChatFeedMessage, AiStatusFeedMessage } from "@/types/tasks";
 
 declare global {
   interface Liveblocks {
@@ -32,8 +33,13 @@ declare global {
       };
     };
 
-    // Custom events, for useBroadcastEvent, useEventListener
-    // Not defined yet — no room events exist.
+    // Custom events, for useBroadcastEvent, useEventListener. Unused —
+    // `23-design-agent-logic.md` originally announced AI generation status
+    // this way, but `24-ai-presence-state.md` moved that to a real
+    // Liveblocks feed instead (`types/tasks.ts`'s `AI_STATUS_FEED_ID`,
+    // published via `lib/liveblocks.ts`'s `publishAiStatus`, subscribed to
+    // via `useFeedMessages`) — a feed persists its messages and has a
+    // purpose-built client hook, unlike a fire-and-forget broadcast event.
     RoomEvent: Record<string, never>;
 
     // Custom metadata set on threads, for useThreads, useCreateThread, etc.
@@ -43,6 +49,21 @@ declare global {
     // Custom room info set with resolveRoomsInfo, for useRoomInfo
     // Not defined yet — no room info resolver exists.
     RoomInfo: Record<string, never>;
+
+    // Custom metadata set on a feed (`createFeed`'s `metadata`), for
+    // useFeeds, useCreateFeed, etc. Not used — `ai-status-feed` is created
+    // with no metadata, per `24-ai-presence-state.md`.
+    FeedMetadata: Record<string, never>;
+
+    // Custom payload shape for a feed message, for useFeedMessages,
+    // useCreateFeedMessage, etc. Liveblocks types this globally, not
+    // per-feed, so this is a union of every feed's message shape:
+    // `AiStatusFeedMessage` (`ai-status-feed`, `24-ai-presence-state.md`) and
+    // `AiChatFeedMessage` (`ai-chat`, `25-sidebar-chat-feed.md`). Each feed's
+    // own hook (`use-ai-status-feed.ts`, `use-ai-chat-feed.ts`) re-validates
+    // against its own specific schema before trusting `.data`, since this
+    // type alone doesn't say which member a given message actually is.
+    FeedMessageData: AiStatusFeedMessage | AiChatFeedMessage;
   }
 }
 

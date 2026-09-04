@@ -2,7 +2,7 @@
 
 import { useOthers } from "@liveblocks/react";
 import { ViewportPortal } from "@xyflow/react";
-import { MousePointer2 } from "lucide-react";
+import { Loader2, MousePointer2 } from "lucide-react";
 
 /**
  * Renders every other participant's live cursor, per
@@ -35,9 +35,16 @@ export function LiveCursors() {
               style={{ color: other.info.color, fill: other.info.color }}
             />
             <span
-              className="whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium text-copy-primary shadow"
+              className="flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium text-copy-primary shadow"
               style={{ backgroundColor: other.info.color }}
             >
+              {/* Spinner for `thinking: true` in presence, per
+                  `24-ai-presence-state.md` — hidden when `thinking` is
+                  `false` or absent, for any participant (not just the AI
+                  agent), since presence itself is generic. */}
+              {other.presence.thinking && (
+                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+              )}
               {other.info.name}
             </span>
           </div>

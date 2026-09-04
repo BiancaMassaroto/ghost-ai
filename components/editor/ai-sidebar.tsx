@@ -16,6 +16,8 @@ interface AiSidebarProps {
   isOpen: boolean;
   /** Called when the close button is pressed. */
   onClose: () => void;
+  /** The active project's ID — also the Liveblocks room ID, per `26-design-agent-frontend.md`'s `AiArchitectTab`. */
+  projectId: string;
   className?: string;
 }
 
@@ -25,11 +27,13 @@ interface AiSidebarProps {
  * only the sidebar's own UI structure: the header, the AI Architect/Specs
  * tabs, and their bodies (each split into its own component below).
  * Mirrors `ProjectSidebar`'s collapsing push-panel pattern, anchored to the
- * right edge instead of the left. Still no Liveblocks or AI generation
- * logic — `AiArchitectTab` and `SpecsTab` are UI-only, per the spec's scope
- * limits.
+ * right edge instead of the left. `AiArchitectTab` now owns real Liveblocks
+ * chat/status/presence and AI generation logic (`25-sidebar-chat-feed.md`,
+ * `24-ai-presence-state.md`, `26-design-agent-frontend.md`); `projectId`
+ * (the active project's ID, also the Liveblocks room ID) is threaded through
+ * to it unchanged. `SpecsTab` remains UI-only.
  */
-export function AiSidebar({ isOpen, onClose, className }: AiSidebarProps) {
+export function AiSidebar({ isOpen, onClose, projectId, className }: AiSidebarProps) {
   return (
     // See `ProjectSidebar` for why the width-animating collapse lives on
     // this outer wrapper while the inner `<aside>` stays a fixed `w-96` —
@@ -75,7 +79,7 @@ export function AiSidebar({ isOpen, onClose, className }: AiSidebarProps) {
             value="architect"
             className="flex flex-1 flex-col overflow-hidden pb-4"
           >
-            <AiArchitectTab />
+            <AiArchitectTab projectId={projectId} />
           </TabsContent>
 
           <TabsContent

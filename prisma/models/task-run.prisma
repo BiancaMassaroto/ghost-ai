@@ -1,0 +1,16 @@
+/// Tracks a Trigger.dev background run so it can later be looked up with
+/// ownership verified — e.g. by `POST /api/ai/design/token` before issuing a
+/// run-scoped public token. `runId` is Trigger.dev's own run identifier
+/// (returned by `tasks.trigger`), not this row's own `id`. `userId` is a
+/// plain Clerk user ID (no FK — users live in Clerk, not this database),
+/// matching `Project.ownerId`'s existing convention.
+model TaskRun {
+  id        String   @id @default(cuid())
+  runId     String   @unique
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@index([userId, projectId])
+}

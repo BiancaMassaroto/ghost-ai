@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // trigger.dev's local `trigger dev` run/build state — already
+    // gitignored (`.gitignore`'s "# trigger.dev" entry); not project
+    // source, so it shouldn't be linted either.
+    ".trigger/**",
   ]),
 ]);
 
